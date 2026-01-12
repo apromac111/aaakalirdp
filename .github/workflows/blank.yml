@@ -9,14 +9,14 @@ jobs:
     timeout-minutes: 3600
 
     steps:
-      - name: Install Desktop & RDP
+      - name: Base system + desktop + RDP
         run: |
           sudo apt update
-          sudo apt install -y xfce4 xfce4-goodies xrdp dbus-x11
+          sudo apt install -y xfce4 xfce4-goodies xrdp dbus-x11 curl wget git net-tools
           sudo systemctl enable xrdp
           sudo adduser xrdp ssl-cert
 
-      - name: Create user
+      - name: Create kali user
         run: |
           sudo useradd -m kali
           echo "kali:kali" | sudo chpasswd
@@ -30,27 +30,40 @@ jobs:
         run: |
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=kali-gh-${{ github.run_id }}
 
-      - name: Install Kali tools (safe)
+      # ---------- CORE KALI TOOLS ----------
+      - name: Install Metasploit & Armitage (snap)
+        run: |
+          sudo snap install metasploit-framework
+          sudo snap install armitage
+
+      - name: Install Kali-style tools
         run: |
           sudo apt install -y \
-            nmap net-tools dnsutils hydra john wireshark \
-            metasploit-framework armitage exploitdb sqlmap \
-            nikto gobuster responder smbclient enum4linux
+            nmap sqlmap nikto gobuster hydra john wireshark smbclient tcpdump
 
-      - name: Configure XFCE
+      - name: Install Enum4linux, Responder, ExploitDB
+        run: |
+          sudo git clone https://github.com/CiscoCXSecurity/enum4linux.git /opt/enum4linux
+          sudo git clone https://github.com/SpiderLabs/Responder.git /opt/responder
+          sudo git clone https://github.com/offensive-security/exploitdb.git /opt/exploitdb
+
+          sudo ln -s /opt/enum4linux/enum4linux.pl /usr/local/bin/enum4linux
+          sudo ln -s /opt/responder/Responder.py /usr/local/bin/responder
+
+      - name: XFCE session config
         run: |
           echo "xfce4-session" | sudo tee /home/kali/.xsession
           sudo chown kali:kali /home/kali/.xsession
 
       - name: Show login info
         run: |
-          echo "======================"
+          echo "=============================="
           echo "RDP LOGIN"
           echo "User: kali"
           echo "Pass: kali"
           echo "Tailscale IP:"
           tailscale ip -4
-          echo "======================"
+          echo "=============================="
 
       - name: Keep alive
         run: |
