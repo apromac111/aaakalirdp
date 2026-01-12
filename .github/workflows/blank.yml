@@ -1,4 +1,4 @@
-name: Kali Linux RDP
+name: Kali RDP
 
 on:
   workflow_dispatch:
@@ -9,32 +9,18 @@ jobs:
     timeout-minutes: 3600
 
     steps:
-      - name: Update system
+      - name: Install Desktop & RDP
         run: |
           sudo apt update
-          sudo apt install -y wget curl gnupg2 lsb-release software-properties-common
-
-      - name: Install desktop & RDP
-        run: |
           sudo apt install -y xfce4 xfce4-goodies xrdp dbus-x11
           sudo systemctl enable xrdp
           sudo adduser xrdp ssl-cert
 
-      - name: Create RDP user
+      - name: Create user
         run: |
           sudo useradd -m kali
           echo "kali:kali" | sudo chpasswd
           sudo usermod -aG sudo kali
-
-      - name: Add Kali rolling repository
-        run: |
-          echo "deb http://http.kali.org/kali kali-rolling main non-free contrib" | sudo tee /etc/apt/sources.list.d/kali.list
-          wget -qO - https://archive.kali.org/archive-key.asc | sudo apt-key add -
-          sudo apt update
-
-      - name: Install Kali base tools
-        run: |
-          sudo apt install -y kali-linux-default
 
       - name: Install Tailscale
         run: |
@@ -44,20 +30,27 @@ jobs:
         run: |
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=kali-gh-${{ github.run_id }}
 
-      - name: Configure XFCE for RDP
+      - name: Install Kali tools (safe)
+        run: |
+          sudo apt install -y \
+            nmap net-tools dnsutils hydra john wireshark \
+            metasploit-framework armitage exploitdb sqlmap \
+            nikto gobuster responder smbclient enum4linux
+
+      - name: Configure XFCE
         run: |
           echo "xfce4-session" | sudo tee /home/kali/.xsession
           sudo chown kali:kali /home/kali/.xsession
 
       - name: Show login info
         run: |
-          echo "=============================="
-          echo "Kali RDP Login"
+          echo "======================"
+          echo "RDP LOGIN"
           echo "User: kali"
           echo "Pass: kali"
           echo "Tailscale IP:"
           tailscale ip -4
-          echo "=============================="
+          echo "======================"
 
       - name: Keep alive
         run: |
