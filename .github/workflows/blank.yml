@@ -26,14 +26,19 @@ jobs:
         run: |
           curl -fsSL https://tailscale.com/install.sh | sh
 
-      # --- SAME LOGIC AS YOUR WINDOWS VERSION ---
-      - name: Establish Tailscale Connection
+      # -------- BROWSER-BASED LOGIN ----------
+      - name: Establish Tailscale Connection (Browser)
         run: |
-          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-${{ github.run_id }}
+          sudo tailscale up --hostname=gh-kali-${{ github.run_id }}
+
+          echo "----------------------------------------"
+          echo "OPEN THIS URL IN YOUR BROWSER TO LOGIN:"
+          tailscale login
+          echo "----------------------------------------"
 
           tsIP=""
           retries=0
-          while [ -z "$tsIP" ] && [ $retries -lt 10 ]; do
+          while [ -z "$tsIP" ] && [ $retries -lt 60 ]; do
               tsIP=$(tailscale ip -4 | head -n 1)
               sleep 5
               retries=$((retries+1))
@@ -46,8 +51,8 @@ jobs:
 
           echo "TAILSCALE_IP=$tsIP" >> $GITHUB_ENV
 
-      # --------- CORE KALI TOOLS ----------
-      - name: Install Metasploit & Armitage (snap)
+      # --------- KALI TOOLSET ----------
+      - name: Install Metasploit & Armitage
         run: |
           sudo snap install metasploit-framework
           sudo snap install armitage
@@ -62,11 +67,10 @@ jobs:
           sudo git clone https://github.com/CiscoCXSecurity/enum4linux.git /opt/enum4linux
           sudo git clone https://github.com/SpiderLabs/Responder.git /opt/responder
           sudo git clone https://github.com/offensive-security/exploitdb.git /opt/exploitdb
-
           sudo ln -s /opt/enum4linux/enum4linux.pl /usr/local/bin/enum4linux
           sudo ln -s /opt/responder/Responder.py /usr/local/bin/responder
 
-      - name: Configure XFCE for RDP
+      - name: Configure XFCE
         run: |
           echo "xfce4-session" | sudo tee /home/kali/.xsession
           sudo chown kali:kali /home/kali/.xsession
