@@ -1,4 +1,4 @@
-name: Kali RDP
+name: Kali Linux RDP
 
 on:
   workflow_dispatch:
@@ -9,14 +9,14 @@ jobs:
     timeout-minutes: 3600
 
     steps:
-      - name: Base system + desktop + RDP
+      - name: Base system, desktop & RDP
         run: |
           sudo apt update
           sudo apt install -y xfce4 xfce4-goodies xrdp dbus-x11 curl wget git net-tools
           sudo systemctl enable xrdp
           sudo adduser xrdp ssl-cert
 
-      - name: Create kali user
+      - name: Create RDP user
         run: |
           sudo useradd -m kali
           echo "kali:kali" | sudo chpasswd
@@ -26,11 +26,27 @@ jobs:
         run: |
           curl -fsSL https://tailscale.com/install.sh | sh
 
-      - name: Connect Tailscale
+      # --- SAME LOGIC AS YOUR WINDOWS VERSION ---
+      - name: Establish Tailscale Connection
         run: |
-          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=kali-gh-${{ github.run_id }}
+          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-${{ github.run_id }}
 
-      # ---------- CORE KALI TOOLS ----------
+          tsIP=""
+          retries=0
+          while [ -z "$tsIP" ] && [ $retries -lt 10 ]; do
+              tsIP=$(tailscale ip -4 | head -n 1)
+              sleep 5
+              retries=$((retries+1))
+          done
+
+          if [ -z "$tsIP" ]; then
+              echo "Tailscale IP not assigned. Exiting."
+              exit 1
+          fi
+
+          echo "TAILSCALE_IP=$tsIP" >> $GITHUB_ENV
+
+      # --------- CORE KALI TOOLS ----------
       - name: Install Metasploit & Armitage (snap)
         run: |
           sudo snap install metasploit-framework
@@ -50,7 +66,7 @@ jobs:
           sudo ln -s /opt/enum4linux/enum4linux.pl /usr/local/bin/enum4linux
           sudo ln -s /opt/responder/Responder.py /usr/local/bin/responder
 
-      - name: XFCE session config
+      - name: Configure XFCE for RDP
         run: |
           echo "xfce4-session" | sudo tee /home/kali/.xsession
           sudo chown kali:kali /home/kali/.xsession
@@ -61,8 +77,7 @@ jobs:
           echo "RDP LOGIN"
           echo "User: kali"
           echo "Pass: kali"
-          echo "Tailscale IP:"
-          tailscale ip -4
+          echo "Tailscale IP: $TAILSCALE_IP"
           echo "=============================="
 
       - name: Keep alive
