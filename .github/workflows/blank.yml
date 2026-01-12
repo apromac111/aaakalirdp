@@ -1,0 +1,64 @@
+name: Kali Linux RDP
+
+on:
+  workflow_dispatch:
+
+jobs:
+  kali:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3600
+
+    steps:
+      - name: Update system
+        run: |
+          sudo apt update
+          sudo apt install -y wget curl gnupg2 lsb-release software-properties-common
+
+      - name: Install desktop & RDP
+        run: |
+          sudo apt install -y xfce4 xfce4-goodies xrdp dbus-x11
+          sudo systemctl enable xrdp
+          sudo adduser xrdp ssl-cert
+
+      - name: Create RDP user
+        run: |
+          sudo useradd -m kali
+          echo "kali:kali" | sudo chpasswd
+          sudo usermod -aG sudo kali
+
+      - name: Add Kali rolling repository
+        run: |
+          echo "deb http://http.kali.org/kali kali-rolling main non-free contrib" | sudo tee /etc/apt/sources.list.d/kali.list
+          wget -qO - https://archive.kali.org/archive-key.asc | sudo apt-key add -
+          sudo apt update
+
+      - name: Install Kali base tools
+        run: |
+          sudo apt install -y kali-linux-default
+
+      - name: Install Tailscale
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+
+      - name: Connect Tailscale
+        run: |
+          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=kali-gh-${{ github.run_id }}
+
+      - name: Configure XFCE for RDP
+        run: |
+          echo "xfce4-session" | sudo tee /home/kali/.xsession
+          sudo chown kali:kali /home/kali/.xsession
+
+      - name: Show login info
+        run: |
+          echo "=============================="
+          echo "Kali RDP Login"
+          echo "User: kali"
+          echo "Pass: kali"
+          echo "Tailscale IP:"
+          tailscale ip -4
+          echo "=============================="
+
+      - name: Keep alive
+        run: |
+          while true; do sleep 300; done
